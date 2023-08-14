@@ -7,6 +7,7 @@ app.use(cors());
 app.use(express.json());
 const axios = require("axios");
 const request = require("request");
+const { Configuration, OpenAIApi } = require("openai");
 
 const { MongoClient, ObjectId, ServerApiVersion } = require("mongodb");
 
@@ -30,14 +31,44 @@ const run = async () => {
       console.log(result);
       res.send(result);
     });
+    // dalle
+    app.post("/dalle", async (req, res) => {
+      const items = req.body;
+      try {
+        //configure openai
+        const configuration = new Configuration({
+          apiKey: process.env.OPENAI_API_KEY,
+        });
+        const openai = new OpenAIApi(configuration);
+
+        //structured prompt
+        const data = {
+          prompt: items?.prompt,
+          n: 1,
+          size: "1024x1024",
+        };
+        //creating image
+        const response = await openai.createImage(data);
+        //adding the response to the database
+        const result = await itemsCollection.insertOne(response);
+        console.log(response);
+        res.send(result);
+      } catch (error) {
+        console.error("Error:", error);
+        res
+          .status(500)
+          .send("An error occurred while processing your request.");
+      }
+    });
+
     //stablediffusion
     app.post("/sd", async (req, res) => {
       const items = req.body;
       //structured prompt
       const data = {
-        key: items.key,
-        prompt: items.prompt,
-        negative_prompt: items.negative_prompt,
+        key: process.env.STABBLE_DIFFUSION_API_KEY,
+        prompt: items?.prompt,
+        negative_prompt: items?.negative_prompt,
         width: "512",
         height: "512",
         samples: "1",
@@ -53,7 +84,7 @@ const run = async () => {
         webhook: null,
         track_id: null,
       };
-      //api call to sdapi
+      //api call to stabblediffusionapi
       try {
         const response = await axios.post(
           "https://stablediffusionapi.com/api/v3/text2img",
